@@ -1,0 +1,8 @@
+# Python
+*.pyc
+
+# Data
+data/
+
+# Models
+*.h5
