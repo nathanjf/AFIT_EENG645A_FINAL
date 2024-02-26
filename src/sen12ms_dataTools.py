@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sen12ms_dataLoader import SEN12MSDataset, Seasons, LCBands, S1Bands, S2Bands
 
 sen12ms_path = os.path.join(os.path.dirname(__file__), "..", "data")
+spring_only_path = os.path.join(os.path.dirname(__file__), "..", "data", "spring_only.txt")
 
 seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
 classes = {
@@ -32,8 +33,12 @@ def sen2_color_image(image : np.array):
     for i in range(0,image.shape[0]):
         for j in range(0,image.shape[1]):
             color_idx = 0
-            for k in [3+3,2+3,1+3]:
-                out[i][j][color_idx] = image[i][j][k] #/ (2**15)
+            # loop over the bands in rgb order
+            for k in [3,2,1]:
+                # Scale to the range of [-1 to 1]
+                out[i][j][color_idx] = image[i][j][k] / (2**15)
+                # TODO : Experiment with shifting by 2**15 and norming by w^16
+
                 color_idx += 1
 
     return out / np.max(out)
@@ -44,7 +49,12 @@ def igbp_color_image(image : np.array):
     # Iterate over the pixels and replace them with the colors from the class dictionary
     for i in range(0,image.shape[0]):
         for j in range(0,image.shape[1]):
-            out[i][j] = classes[image[i][j]]
+            # It seems like there is missing data for some of the images
+            if out[i][j] not in classes.keys():
+                print("missing pixel")
+                out[i][j] = [0, 0, 0]
+            else:
+                out[i][j] = classes[image[i][j]]
     return out.astype(int)
 
 # Load a list of all the available files and return it
@@ -53,12 +63,15 @@ class SEN12MSDataTools():
         self.sen12ms = SEN12MSDataset(sen12ms_path)
     
         # Load all the season ids
-        spring_ids  = self.sen12ms.get_season_ids(Seasons.SPRING)
-        summer_ids  = self.sen12ms.get_season_ids(Seasons.SUMMER)
-        fall_ids    = self.sen12ms.get_season_ids(Seasons.FALL)
-        winter_ids  = self.sen12ms.get_season_ids(Seasons.WINTER)
-
-        ids_list = [spring_ids, summer_ids, fall_ids, winter_ids]
+        if not os.path.exists(spring_only_path):
+            spring_ids  = self.sen12ms.get_season_ids(Seasons.SPRING)
+            summer_ids  = self.sen12ms.get_season_ids(Seasons.SUMMER)
+            fall_ids    = self.sen12ms.get_season_ids(Seasons.FALL)
+            winter_ids  = self.sen12ms.get_season_ids(Seasons.WINTER)
+            ids_list = [spring_ids, summer_ids, fall_ids, winter_ids]
+        else:
+            spring_ids  = self.sen12ms.get_season_ids(Seasons.SPRING)
+            ids_list = [spring_ids]
 
         # Calculate total length of the dataset
         dataset_length = 0
@@ -92,7 +105,7 @@ class SEN12MSDataTools():
         
         # Replace each label with a color
         # subplot all 3 next to eachother
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=[10,10])
         
         # ax1 is a color sentinel 2 image
         ax1.imshow(sen2_color_image(x))
@@ -102,5 +115,8 @@ class SEN12MSDataTools():
 
         # ax3 is the predicted labels
         ax3.imshow(igbp_color_image(y_pred))
+
+
+        fig.tight_layout()
 
         plt.savefig(filename)

@@ -36,6 +36,10 @@ def flatten_image(image : np.array):
             out[x][y] = image[x][y][0]
     return out
 
+def normalize_image(image : np.array):
+    image = image.astype(float) / float(2**15)
+    return image
+
 def reorder_image(image : np.array):
     image = np.swapaxes(image, 0, 1)
     image = np.swapaxes(image, 1, 2)
@@ -96,31 +100,30 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
                 s2_bands=S2Bands.ALL, 
                 lc_bands=LCBands.IGBP)
 
-            s1 = reorder_image(s1)
+            #s1 = reorder_image(s1)
             s2 = reorder_image(s2)
             lc = reorder_image(lc)
 
             row_x = s2#np.dstack([s1, s2])
             row_y = lc
 
-            x[dataset_idx - start_idx] = row_x #/ 2**13
+            x[dataset_idx - start_idx] = row_x
             y[dataset_idx - start_idx] = row_y
 
         # Do any preprocessing steps on the batches
 
+        
         x = x
         y = onehot_encode(y)
 
         return x, y
 
     def calculate_class_weights(self):
-        
-        bar = progressbar.ProgressBar(0, self.data.shape[0] * 256 * 256, widgets=['[',progressbar.SimpleProgress(),']',progressbar.Percentage()])
         self.class_weights = {}
+        
         # Get all the patches, count occurences of pixel categories
         total_samples = 0
-        
-
+        bar = progressbar.ProgressBar(0, self.data.shape[0] * 256 * 256, widgets=['[',progressbar.SimpleProgress(),']',progressbar.Percentage()])
         for dataset_idx in range(0, self.data.shape[0]):
             
             # Load triplet from index
@@ -164,11 +167,11 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
             s2_bands=S2Bands.ALL, 
             lc_bands=LCBands.IGBP)
 
-        s1 = reorder_image(s1)
+        #s1 = reorder_image(s1)
         s2 = reorder_image(s2)
         lc = reorder_image(lc)
 
-        x = s2#np.dstack([s1, s2])
+        x = normalize_image(s2) #np.dstack([s1, s2])
         y = flatten_image(lc)
 
         return x, y
