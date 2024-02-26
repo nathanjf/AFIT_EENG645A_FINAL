@@ -1,36 +1,75 @@
-
-from sen12ms_sequence import SEN12MSSequence
-
 import os
-import keras
-import tensorflow as tf
 import numpy as np
 
+import keras
 import tensorflow as tf
 
-import gc
-from keras import backend as k
-from keras.layers import Conv2D, BatchNormalization, ReLU
-from keras.callbacks import Callback
+from sen12ms_dataTools import SEN12MSDataTools
+from sen12ms_sequence import SEN12MSSequence
+import modelTools
 
-from keras.layers import Input, Conv2D, Conv2DTranspose, MaxPooling2D, UpSampling2D, Add, BatchNormalization
+EPOCHS = 100
+BATCH_SIZE = 4
 
-from keras.utils import plot_model
+figure_base_path = os.path.join(os.path.dirname(__file__), "..", "figures")
 
-class ClearMemory(Callback):
-    def on_epoch_end(self, epoch, logs=None):
-        gc.collect()
-        k.clear_session()
-        print("Cleared memory")
+model_1_path = os.path.join(os.path.dirname(__file__), "..", "models", "model_1.keras")
+model_1_figure_path = os.path.join(os.path.dirname(__file__), "..", "figures", "model_1.png")
+model_1_log_path = os.path.join(os.path.dirname(__file__), "..", "logs", "model_1")
+model_2_path = os.path.join(os.path.dirname(__file__), "..", "models", "model_2.keras")
+model_2_figure_path = os.path.join(os.path.dirname(__file__), "..", "figures", "model_2.png")
+model_2_log_path = os.path.join(os.path.dirname(__file__), "..", "logs", "model_2")
+model_3_path = os.path.join(os.path.dirname(__file__), "..", "models", "model_3.keras")
+model_3_figure_path = os.path.join(os.path.dirname(__file__), "..", "figures", "model_3.png")
+model_3_log_path = os.path.join(os.path.dirname(__file__), "..", "logs", "model_3")
+
+def get_data(data_ratio : float = 1.0, train_ratio : float = 0.8, val_ratio : float = 0.1, test_ratio : float = 0.1):
+    train   : SEN12MSSequence = None
+    val     : SEN12MSSequence = None
+    test    : SEN12MSSequence = None
+
+    # Get list of data
+    sen12ms_datatools : SEN12MSDataTools = SEN12MSDataTools()
+    data : np.array = sen12ms_datatools.get_data()
+    data = data[0:int(data.shape[0]*data_ratio)]
+
+    # Shuffle the dataset
+    np.random.seed(0)
+    np.random.shuffle(data)
+
+    # Calculate the start and stop index for all the splits
+    train_start_index = 0
+    train_stop_index = int(data.shape[0]*train_ratio)
+    val_start_index = train_stop_index
+    val_stop_index = val_start_index + int(data.shape[0]*val_ratio)
+    test_start_index = val_stop_index
+    test_stop_index = test_start_index + int(data.shape[0]*test_ratio)
+
+    # Split the index file
+    train_data  = data[train_start_index:train_stop_index,  :]
+    val_data    = data[val_start_index:val_stop_index,      :]
+    test_data   = data[test_start_index:,    :]
+
+    print(train_data.shape)
+    print(val_data.shape)
+    print(test_data.shape)
+    print(train_data.shape[0] + val_data.shape[0]+ test_data.shape[0])
+
+    # Initialize the sequences
+    train = SEN12MSSequence(train_data, BATCH_SIZE)
+    val = SEN12MSSequence(val_data, BATCH_SIZE)
+    test = SEN12MSSequence(test_data, BATCH_SIZE)
+
+    return train, val, test
 
 def main():
+    # Configure workspace
+    modelTools.set_gpu_gemory_growth()
 
-    batch_size = 4
-    epochs = 100
+    # Data Prep Phase
 
     # Step 1
     # Get data
-
 
     # Step 2
     # Measures of success
@@ -39,125 +78,57 @@ def main():
     # Step 3
     # Prepare data
 
-    sen12ms = SEN12MSSequence(batch_size=batch_size)
+    train, val, test = get_data(0.05) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
+    train.calculate_class_weights()
+    class_weights = train.get_class_weights()
     
-
-    # Step 4
-    # Evaluation Method
-
-    # TODO : Extract data list
-    # Split data list into training, testing, and validation splits
-    # Create training, testing, and validation data splits
-    # TODO : Add the ability to split the generator into different sets by feeding it a predefined list of indexes
-
-    # Calculate weights
-    # TODO : Only calculate on the training set
-    counts = {
-            1: 35169562, 
-            2: 114461610, 
-            3: 8516, 
-            4: 173018642, 
-            5: 91931871, 
-            6: 15266338, 
-            7: 59174553, 
-            8: 177388877, 
-            9: 518445158, 
-            10: 439273502, 
-            11: 31064884, 
-            12: 507802578, 
-            13: 335295405, 
-            14: 42061406, 
-            15: 37774, 
-            16: 1904431, 
-            17: 137003181
-    }
-    weights = {}
-    total = 0
-    for key in counts.keys():
-        total += counts[key]
-    for key in counts.keys():
-        weights[key-1] = float(total) / (float(len(counts.keys())) * float(counts[key]))
+    # Training Phase
 
     model : keras.models.Model = None
-    model_path = os.path.join(os.path.dirname(__file__), "models", "model.h5")
 
+    # Chose which model
     do_train_model : bool = True
-    if do_train_model or not os.path.exists(model_path):
+    do_first_model : bool = True
+    do_second_model : bool = False
+    do_third_model : bool = False
+    if not (do_first_model ^ do_second_model ^ do_third_model):
+        raise RuntimeError("Only one model can be true at at time")
+    
+    # Set file path for selected model
+    model_path = None
+    model_figure_path = None
+    if do_first_model:        
+        model_path = model_1_path
+        model_figure_path = model_1_figure_path
+        model_log_path = model_1_log_path
+    elif do_second_model:
+        model_path = model_2_path
+        model_figure_path = model_2_figure_path
+        model_log_path = model_2_log_path
+    elif do_third_model:
+        model_path = model_3_path
+        model_figure_path = model_3_figure_path
+        model_log_path = model_3_log_path
+
+    # Do model training or load model
+    if do_train_model:
 
         # Step 5
         # Baseline Model
 
-        do_first_fit : bool = False
-        if do_first_fit:
+        if do_first_model:
 
-            input : keras.layers.Layer
-            output : keras.layers.Layer
-
-            input = Input(shape=(256,256,13))
-
-            # CNN
-            conv_layer_1    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(input)
-            conv_layer_2    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_1)
-            batch_norm_1    = BatchNormalization()(conv_layer_2)
-            pooling_layer_1 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_1)
-            
-            conv_layer_3    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_1)
-            conv_layer_4    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_3)
-            batch_norm_2    = BatchNormalization()(conv_layer_4)
-            pooling_layer_2 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_2)
-
-            conv_layer_5    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_2)
-            conv_layer_6    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_5)
-            batch_norm_3    = BatchNormalization()(conv_layer_6)
-            pooling_layer_3 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_3)
-
-            conv_layer_7    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_3)
-            conv_layer_8    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_7)
-            batch_norm_4    = BatchNormalization()(conv_layer_8)
-            pooling_layer_4 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_4)
-
-            # Passthroughs
-            # TODO : Upsample passthrough layers to match intermediate steps
-            passthrough_1 = batch_norm_1
-            passthrough_2 = batch_norm_2
-            passthrough_3 = batch_norm_3
-            passthrough_4 = batch_norm_4
-
-            # FNN
-
-            #upsampling_layer_1 = UpSampling2D(size=(4,4))(pooling_layer_4)
-            deconv_layer_1 = Conv2DTranspose(filters=1024, kernel_size=2, strides=2, padding='same', activation='relu')(pooling_layer_4)
-            conv_layer_9    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_1)
-            #add_layer_1 = Add()([conv_layer_9, passthrough_4])
-
-            #upsampling_layer_2 = UpSampling2D(size=(4,4))(add_layer_1)
-            deconv_layer_2 = Conv2DTranspose(filters=512, kernel_size=2, strides=2, padding='same', activation='relu')(conv_layer_9)
-            conv_layer_10    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_2)
-            add_layer_2 = Add()([conv_layer_10, passthrough_3])
-
-            #upsampling_layer_3 = UpSampling2D(size=(4,4))(add_layer_2)
-            deconv_layer_3 = Conv2DTranspose(filters=256, kernel_size=2, strides=2, padding='same', activation='relu')(add_layer_2)
-            conv_layer_11    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_3)
-            add_layer_3 = Add()([conv_layer_11, passthrough_2])
-
-            #upsampling_layer_4 = UpSampling2D(size=(4,4))(add_layer_3)
-            deconv_layer_4 = Conv2DTranspose(filters=128, kernel_size=2, strides=2, padding='same', activation='relu')(add_layer_3)
-            conv_layer_12    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_4)
-            add_layer_4 = Add()([conv_layer_12, passthrough_1])
-
-            output = Conv2DTranspose(filters=17, kernel_size=2, strides=1, padding='same', activation='softmax')(add_layer_4)
-
-            model = keras.models.Model(inputs=input, outputs=output)
-
-            model.summary()
-            plot_model(model, to_file='model.png', show_shapes=True, show_layer_names=True, show_layer_activations=True)
-            pass
+            model = modelTools.model_1(
+                input_shape=(256,256,13),
+                num_classes=17,
+                resnet_depth=100,
+                resnet_filters=16
+            )
 
         # Step 6
         # Overfit Model
 
-        do_second_fit : bool = False
-        if do_second_fit:
+        if do_second_model:
         
             # TODO : 
 
@@ -166,28 +137,32 @@ def main():
         # Step 7
         # Regularize Model
 
-        do_third_fit : bool = False
-        if do_third_fit:
+        if do_third_model:
             
             # TODO :
             
             pass
 
+        # Plot the model
+        keras.utils.plot_model(model, to_file=model_figure_path, show_shapes=False, show_layer_names=False, show_layer_activations=False)
+
+        # Compile the model
         model.compile(
-            optimizer='rmsprop',
+            optimizer='adam',
             loss='categorical_crossentropy',
-            metrics=['categorical_accuracy'],
-            #run_eagerly=True
+            metrics=['categorical_accuracy']
         )
 
+        # Fit the model
         model.fit(
-            x=sen12ms,
-            batch_size=batch_size,
-            epochs=epochs,
-            workers=4,
-            use_multiprocessing=True,
-            class_weight=weights,
-            callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), ClearMemory()]
+            x=train,
+            validation_data=val,
+            class_weight=class_weights,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
+            workers=8,
+            use_multiprocessing=True
         )
 
         model.save(model_path)
@@ -195,16 +170,25 @@ def main():
         model = keras.models.load_model(model_path)
         pass
 
-    # Test prediction by grabbing a random element and plotting it
-    #sen12ms.plot_item(10)
-    x, y = sen12ms.__getitem__(10)
-    # TODO : Swap y to argmax also
-    y_pred = np.argmax(model.predict(x), axis=3, keepdims=True)
+    # Predict val set
+    x : SEN12MSSequence = None
+    do_test : bool = False
+    if do_test:
+        x = test
+    else:
+        x = val
 
-    sen12ms.plot_predictions(x=x,y=y,y_pred=y_pred,idx=3)
+    y_pred = model.predict(
+        x=x, 
+        workers = 8, 
+        use_multiprocessing=True
+    )
 
-    # Step 8
-    # Test Set Performance
+    # Extract corresponding x, y, y_pred triplet
+    x, y = x.get_item(0)
+    y_pred = np.argmax(y_pred[0], axis=2)
+    print(x.shape, y.shape, y_pred.shape)
+    SEN12MSDataTools.plot_prediction(x, y, y_pred, os.path.join(figure_base_path, "prediction_1.png"))
 
 if __name__ == "__main__":
     main()
