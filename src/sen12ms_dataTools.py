@@ -8,23 +8,23 @@ sen12ms_path = os.path.join(os.path.dirname(__file__), "..", "data")
 
 seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
 classes = {
-    1   : [230,25,75],  # Evergreen Needleleaf Forests
-    2   : [60,180,75],  # Evergreen Broadleaf Forests
-    3   : [255,225,25], # Deciduous Needleleaf Forests
-    4   : [0,130,200],  # Deciduous Broadleaf Forests
-    5   : [235,130,48],  # Mixed Forests
-    6   : [145,30,180],  # Closed (Dense) Shrubland
-    7   : [70,240,240],  # Open (Sparse) Shrubland
-    8   : [240,50,230],  # Woody Savannas
-    9   : [210,245,60],  # Savannas
-    10   : [250,190,212],  # Grasslands
-    11  : [0,128,128],  # Permanent Wetlands
-    12  : [220,190,255],  # Croplands
-    13  : [170,110,40],  # Urban and Built-Up Lands
-    14  : [255,250,200],  # Croplands/Natural Vegetation Mosaics
-    15  : [120,0,0],  # Permanent Snow and Ice
-    16  : [170,255,195],  # Barren
-    17  : [128,128,0],  # Water Bodies
+    1   : [230,25,75],      # Evergreen Needleleaf Forests
+    2   : [60,180,75],      # Evergreen Broadleaf Forests
+    3   : [255,225,25],     # Deciduous Needleleaf Forests
+    4   : [0,130,200],      # Deciduous Broadleaf Forests
+    5   : [235,130,48],     # Mixed Forests
+    6   : [145,30,180],     # Closed (Dense) Shrubland
+    7   : [70,240,240],     # Open (Sparse) Shrubland
+    8   : [240,50,230],     # Woody Savannas
+    9   : [210,245,60],     # Savannas
+    10  : [250,190,212],    # Grasslands
+    11  : [0,128,128],      # Permanent Wetlands
+    12  : [220,190,255],    # Croplands
+    13  : [170,110,40],     # Urban and Built-Up Lands
+    14  : [255,250,200],    # Croplands/Natural Vegetation Mosaics
+    15  : [120,0,0],        # Permanent Snow and Ice
+    16  : [170,255,195],    # Barren
+    17  : [128,128,0],      # Water Bodies
 }
 
 def sen2_color_image(image : np.array):
@@ -87,22 +87,6 @@ class SEN12MSDataTools():
 
     def get_data(self):
         return self.data
-    
-    def calculate_weights(self):
-        self.weights = {}
-        # Get all the patches, count occurences of pixel categories
-        for dataset_idx in range(0, self.data.shape[0]):
-            
-            # Load triplet from index
-            s1, s2, lc, bounds = self.sen12ms.get_s1s2lc_triplet(
-                seasons[int(self.data[dataset_idx][0])], 
-                int(self.data[dataset_idx][1]), 
-                int(self.data[dataset_idx][2]), 
-                s1_bands=S1Bands.ALL,
-                s2_bands=S2Bands.ALL, 
-                lc_bands=LCBands.IGBP)
-
-            print(lc.shape)
 
     def plot_prediction(x, y, y_pred, filename):
         
