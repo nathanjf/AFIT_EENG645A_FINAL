@@ -87,7 +87,7 @@ def main():
     model : keras.models.Model = None
 
     # Chose which model
-    do_train_model : bool = True
+    do_train_model : bool = False
     do_first_model : bool = True
     do_second_model : bool = False
     do_third_model : bool = False
@@ -121,7 +121,7 @@ def main():
             model = modelTools.model_1(
                 input_shape=(256,256,13),
                 num_classes=17,
-                resnet_depth=100,
+                resnet_depth=50,
                 resnet_filters=16
             )
 
@@ -161,7 +161,7 @@ def main():
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
-            workers=8,
+            workers=32,
             use_multiprocessing=True
         )
 
@@ -185,8 +185,8 @@ def main():
     )
 
     # Extract corresponding x, y, y_pred triplet
-    x, y = x.get_item(0)
-    y_pred = np.argmax(y_pred[0], axis=2)
+    x, y = x.get_item(100)
+    y_pred = np.argmax(y_pred[100], axis=2) + 1
     print(x.shape, y.shape, y_pred.shape)
     SEN12MSDataTools.plot_prediction(x, y, y_pred, os.path.join(figure_base_path, "prediction_1.png"))
 

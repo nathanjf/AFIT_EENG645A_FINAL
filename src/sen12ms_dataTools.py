@@ -27,6 +27,25 @@ classes = {
     16  : [170,255,195],    # Barren
     17  : [128,128,0],      # Water Bodies
 }
+names = {
+    1   : 'Evergreen Needleleaf Forests',
+    2   : 'Evergreen Broadleaf Forests',
+    3   : 'Deciduous Needleleaf Forests',
+    4   : 'Deciduous Broadleaf Forests',
+    5   : 'Mixed Forests',
+    6   : 'Closed (Dense) Shrubland',
+    7   : 'Open (Sparse) Shrubland',
+    8   : 'Woody Savannas',
+    9   : 'Savannas',
+    10  : 'Grasslands',
+    11  : 'Permanent Wetlands',
+    12  : 'Croplands',
+    13  : 'Urban and Built-Up Lands',
+    14  : 'Croplands/Natural Vegetation Mosaics',
+    15  : 'Permanent Snow and Ice',
+    16  : 'Barren',
+    17  : 'Water Bodies'
+}
 
 def sen2_color_image(image : np.array):
     out = np.zeros((image.shape[0],image.shape[1],3))
@@ -50,7 +69,7 @@ def igbp_color_image(image : np.array):
     for i in range(0,image.shape[0]):
         for j in range(0,image.shape[1]):
             # It seems like there is missing data for some of the images
-            if out[i][j] not in classes.keys():
+            if image[i][j] not in classes.keys():
                 print("missing pixel")
                 out[i][j] = [0, 0, 0]
             else:
