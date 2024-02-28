@@ -3,6 +3,7 @@ import math
 import numpy as np
 import tensorflow as tf
 import progressbar
+from multiprocessing.pool import ThreadPool
 
 from sen12ms_dataLoader import SEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
 
@@ -37,7 +38,7 @@ def flatten_image(image : np.array):
     return out
 
 def normalize_image(image : np.array):
-    image = image.astype(float) / float(2**15)
+    image = image.astype(float) / float((2.0**16.0)-1.0)
     return image
 
 def reorder_image(image : np.array):
@@ -71,6 +72,36 @@ def onehot_encode(y : np.array):
                     y_onehot[i][j][k] = classes[y[i][j][k][0]]
 
     return y_onehot
+
+def _thread_calculate_class_weights(args):
+    class_weights = {}
+    for key in classes.keys():
+        class_weights[key-1] = 0
+
+    sen12ms : SEN12MSDataset = args[0]
+    data = args[1]
+
+    # Load triplet from index
+    lc = sen12ms.get_patch(
+        seasons[int(data[0])],
+        int(data[1]),
+        int(data[2]),
+        LCBands.IGBP)
+
+    # Get the counts of each class
+    unique, counts = np.unique(lc[0], return_counts=True)
+            
+    # Update the class weights with the counts
+    for i in range(0,len(unique)):
+        if unique[i]-1 in class_weights.keys():
+            class_weights[unique[i]-1] += counts[i]
+        else:
+            class_weights[unique[i]-1] = counts[i]
+
+    # Increase total samples by the number of pixels
+    samples = 256 * 256
+
+    return class_weights, samples
 
 class SEN12MSSequence(tf.keras.utils.Sequence):
 
@@ -113,42 +144,40 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
         # Do any preprocessing steps on the batches
 
         
-        x = x
+        x = normalize_image(x)
         y = onehot_encode(y)
 
         return x, y
+
 
     def calculate_class_weights(self):
         self.class_weights = {}
         
         # Get all the patches, count occurences of pixel categories
         total_samples = 0
-        bar = progressbar.ProgressBar(0, self.data.shape[0] * 256 * 256, widgets=['[',progressbar.SimpleProgress(),']',progressbar.Percentage()])
-        for dataset_idx in range(0, self.data.shape[0]):
-            
-            # Load triplet from index
-            s1, s2, lc, bounds = self.sen12ms.get_s1s2lc_triplet(
-                seasons[int(self.data[dataset_idx][0])], 
-                int(self.data[dataset_idx][1]), 
-                int(self.data[dataset_idx][2]), 
-                s1_bands=S1Bands.ALL,
-                s2_bands=S2Bands.ALL, 
-                lc_bands=LCBands.IGBP)
+        bar = progressbar.ProgressBar(0, self.data.shape[0], widgets=['[',progressbar.SimpleProgress(),']',progressbar.Percentage()])
+        
+        # Create thread arg list
+        args = []
+        for i in range(0, self.data.shape[0]):
+            args.append((self.sen12ms, self.data[i][:]))
 
-            # Get the counts of each class
-            unique, counts = np.unique(lc[0], return_counts=True)
-            
-            # Update the class weights with the counts
-            for i in range(0,len(unique)):
-                if unique[i]-1 in self.class_weights.keys():
-                    self.class_weights[unique[i]-1] += counts[i]
-                else:
-                    self.class_weights[unique[i]-1] = counts[i]
+        # Multithreaded label counting
+        with ThreadPool(128) as pool:
+            for result in pool.imap(_thread_calculate_class_weights, args):
+                # Merge results
+                class_weights = result[0]
+                samples = result[1]
 
-            # Increase total samples by the number of pixels
-            total_samples += 256 * 256
+                for key in class_weights:
+                    if key in self.class_weights.keys():
+                        self.class_weights[key] += class_weights[key]
+                    else:
+                        self.class_weights[key] = 0
 
-            bar.update(total_samples)
+                total_samples += samples
+                
+                bar.update(bar.currval + 1)
 
         # Convert counts into class weights
         for key in self.class_weights.keys():

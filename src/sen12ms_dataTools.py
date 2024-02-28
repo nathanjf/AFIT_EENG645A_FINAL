@@ -1,6 +1,8 @@
 import os
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 
 from sen12ms_dataLoader import SEN12MSDataset, Seasons, LCBands, S1Bands, S2Bands
 
@@ -8,7 +10,7 @@ sen12ms_path = os.path.join(os.path.dirname(__file__), "..", "data")
 spring_only_path = os.path.join(os.path.dirname(__file__), "..", "data", "spring_only.txt")
 
 seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
-classes = {
+colors = {
     1   : [230,25,75],      # Evergreen Needleleaf Forests
     2   : [60,180,75],      # Evergreen Broadleaf Forests
     3   : [255,225,25],     # Deciduous Needleleaf Forests
@@ -54,9 +56,7 @@ def sen2_color_image(image : np.array):
             color_idx = 0
             # loop over the bands in rgb order
             for k in [3,2,1]:
-                # Scale to the range of [-1 to 1]
-                out[i][j][color_idx] = image[i][j][k] / (2**15)
-                # TODO : Experiment with shifting by 2**15 and norming by w^16
+                out[i][j][color_idx] = image[i][j][k]
 
                 color_idx += 1
 
@@ -69,11 +69,11 @@ def igbp_color_image(image : np.array):
     for i in range(0,image.shape[0]):
         for j in range(0,image.shape[1]):
             # It seems like there is missing data for some of the images
-            if image[i][j] not in classes.keys():
+            if image[i][j] not in colors.keys():
                 print("missing pixel")
                 out[i][j] = [0, 0, 0]
             else:
-                out[i][j] = classes[image[i][j]]
+                out[i][j] = colors[image[i][j]]
     return out.astype(int)
 
 # Load a list of all the available files and return it
@@ -124,7 +124,7 @@ class SEN12MSDataTools():
         
         # Replace each label with a color
         # subplot all 3 next to eachother
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=[10,10])
+        fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=[15,5])
         
         # ax1 is a color sentinel 2 image
         ax1.imshow(sen2_color_image(x))
@@ -135,6 +135,15 @@ class SEN12MSDataTools():
         # ax3 is the predicted labels
         ax3.imshow(igbp_color_image(y_pred))
 
+        # Plot the legend for the labels
+        # Pack labels and colors into handles array
+        handles = []
+        for key in colors.keys():
+            color = (np.array(colors[key]) / 255.0)
+            name = names[key]
+            handles.append(Patch(color=color, label=name))
+        ax4.legend(handles=handles, loc='center', frameon=False)
+        ax4.axis('off')
 
         fig.tight_layout()
 

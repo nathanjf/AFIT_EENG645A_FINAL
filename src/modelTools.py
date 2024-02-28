@@ -15,15 +15,12 @@ def set_gpu_gemory_growth():
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
         try:
-            # Currently, memory growth needs to be the same across GPUs
             for gpu in gpus:
                 tf.config.experimental.set_memory_growth(gpu, True)
             logical_gpus = tf.config.list_logical_devices('GPU')
             print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
         except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
             print(e)
-
 
 def RESNetLayer(input_layer, filters, kernel_size):
     
@@ -31,10 +28,9 @@ def RESNetLayer(input_layer, filters, kernel_size):
     batch = BatchNormalization()(conv)
     relu = ReLU()(batch)    
     
-    conv = Conv2D(filters=filters, kernel_size=kernel_size, strides=1, padding='same', activation=None)(relu)
-    batch = BatchNormalization()(conv)
-    relu = ReLU()(batch)
-
+    #conv = Conv2D(filters=filters, kernel_size=kernel_size, strides=1, padding='same', activation=None)(relu)
+    #batch = BatchNormalization()(conv)
+    #relu = ReLU()(batch)
 
     add = Add()([input_layer, relu])
     relu = ReLU()(add)
@@ -51,16 +47,12 @@ def model_1(input_shape=None, num_classes=None, resnet_depth=50, resnet_filters=
     conv = Conv2D(filters=resnet_filters, kernel_size=kernel_size, strides=1, padding='same', activation=None)(inputs)
     batch = BatchNormalization()(conv)    
 
-    # Resnet50
+    # Resnet
     previous_layer = batch
-    for i in range(0,resnet_depth):
+    for i in range(0, resnet_depth):
         next_layer = RESNetLayer(previous_layer, filters=resnet_filters, kernel_size=kernel_size)
         previous_layer = next_layer
     
-    # Encoder
-        
-    # Decoder
-
     # Prediction
     outputs = Conv2D(filters=num_classes, kernel_size=kernel_size, strides=1, padding='same', activation='softmax')(previous_layer)
 
