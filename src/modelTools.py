@@ -28,9 +28,9 @@ def RESNetLayer(input_layer, filters, kernel_size):
     batch = BatchNormalization()(conv)
     relu = ReLU()(batch)    
     
-    #conv = Conv2D(filters=filters, kernel_size=kernel_size, strides=1, padding='same', activation=None)(relu)
-    #batch = BatchNormalization()(conv)
-    #relu = ReLU()(batch)
+    conv = Conv2D(filters=filters, kernel_size=kernel_size, strides=1, padding='same', activation=None)(relu)
+    batch = BatchNormalization()(conv)
+    relu = ReLU()(batch)
 
     add = Add()([input_layer, relu])
     relu = ReLU()(add)

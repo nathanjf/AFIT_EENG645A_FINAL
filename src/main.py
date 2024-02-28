@@ -8,8 +8,6 @@ from sen12ms_dataTools import SEN12MSDataTools
 from sen12ms_sequence import SEN12MSSequence
 import modelTools
 
-strategy = tf.distribute.MirroredStrategy()
-
 EPOCHS = 100
 BATCH_SIZE = 4
 
@@ -52,10 +50,11 @@ def get_data(data_ratio : float = 1.0, train_ratio : float = 0.8, val_ratio : fl
     val_data    = data[val_start_index:val_stop_index,      :]
     test_data   = data[test_start_index:,    :]
 
-    print(train_data.shape)
-    print(val_data.shape)
-    print(test_data.shape)
-    print(train_data.shape[0] + val_data.shape[0]+ test_data.shape[0])
+    # Make sure all splits add up to the expected dataset size
+    # print(train_data.shape)
+    # print(val_data.shape)
+    # print(test_data.shape)
+    # print(train_data.shape[0] + val_data.shape[0]+ test_data.shape[0])
 
     # Initialize the sequences
     train = SEN12MSSequence(train_data, BATCH_SIZE)
@@ -113,6 +112,8 @@ def main():
         model_log_path = model_3_log_path
 
     # Do model training or load model
+    strategy = tf.distribute.MirroredStrategy()
+    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     with strategy.scope():
         if do_train_model:
 
@@ -124,7 +125,7 @@ def main():
                 model = modelTools.model_1(
                     input_shape=(256,256,13),
                     num_classes=17,
-                    resnet_depth=100,
+                    resnet_depth=50,
                     resnet_filters=32
                 )
 
@@ -164,7 +165,7 @@ def main():
                 batch_size=BATCH_SIZE,
                 epochs=EPOCHS,
                 callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
-                workers=32,
+                workers=8,
                 use_multiprocessing=True
             )
 
