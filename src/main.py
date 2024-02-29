@@ -79,7 +79,7 @@ def main():
     # Step 3
     # Prepare data
 
-    train, val, test = get_data(0.10) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
+    train, val, test = get_data(0.05) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
     train.calculate_class_weights()
     class_weights = train.get_class_weights()
 
@@ -88,7 +88,7 @@ def main():
     model : keras.models.Model = None
 
     # Chose which model
-    do_train_model : bool = True
+    do_train_model : bool = False
     do_first_model : bool = True
     do_second_model : bool = False
     do_third_model : bool = False
@@ -112,88 +112,85 @@ def main():
         model_log_path = model_3_log_path
 
     # Do model training or load model
-    strategy = tf.distribute.MirroredStrategy()
-    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
-    with strategy.scope():
-        if do_train_model:
+    if do_train_model:
 
-            # Step 5
-            # Baseline Model
+        # Step 5
+        # Baseline Model
 
-            if do_first_model:
+        if do_first_model:
 
-                model = modelTools.model_1(
-                    input_shape=(256,256,13),
-                    num_classes=17,
-                    resnet_depth=50,
-                    resnet_filters=32
-                )
-
-            # Step 6
-            # Overfit Model
-
-            if do_second_model:
-            
-                # TODO : 
-
-                pass
-
-            # Step 7
-            # Regularize Model
-
-            if do_third_model:
-                
-                # TODO :
-                
-                pass
-
-            # Plot the model
-            keras.utils.plot_model(model, to_file=model_figure_path, show_shapes=False, show_layer_names=False, show_layer_activations=False)
-
-            # Compile the model
-            model.compile(
-                optimizer='adam',
-                loss='categorical_crossentropy',
-                metrics=['categorical_accuracy']
+            model = modelTools.model_1(
+                input_shape=(256,256,13),
+                num_classes=17,
+                resnet_depth=50,
+                resnet_filters=32
             )
 
-            # Fit the model
-            model.fit(
-                x=train,
-                validation_data=val,
-                class_weight=class_weights,
-                batch_size=BATCH_SIZE,
-                epochs=EPOCHS,
-                callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
-                workers=8,
-                use_multiprocessing=True
-            )
+        # Step 6
+        # Overfit Model
 
-            model.save(model_path)
-        else:
-            model = keras.models.load_model(model_path)
+        if do_second_model:
+        
+            # TODO : 
+
             pass
 
+        # Step 7
+        # Regularize Model
+
+        if do_third_model:
+            
+            # TODO :
+            
+            pass
+
+        # Plot the model
+        keras.utils.plot_model(model, to_file=model_figure_path, show_shapes=False, show_layer_names=False, show_layer_activations=False)
+
+        # Compile the model
+        model.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics=['categorical_accuracy']
+        )
+
+        # Fit the model
+        model.fit(
+            x=train,
+            validation_data=val,
+            class_weight=class_weights,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
+            workers=32,
+            use_multiprocessing=True
+        )
+
+        model.save(model_path)
+    else:
+        model = keras.models.load_model(model_path)
+        pass
+
     # Predict val set
-    x : SEN12MSSequence = None
+    x_set : SEN12MSSequence = None
     do_test : bool = False
     if do_test:
-        x = test
+        x_set = test
     else:
-        x = val
+        x_set = val
 
-    y_pred = model.predict(
-        x=x, 
-        workers = 8, 
+    y_pred_set = model.predict(
+        x=x_set, 
+        workers = 32, 
         use_multiprocessing=True
     )
 
-    # Extract corresponding x, y, y_pred triplet
-    pred_idx = 100
-    x, y = x.get_item(pred_idx)
-    print(np.max(x))
-    y_pred = np.argmax(y_pred[pred_idx], axis=2) + 1
-    SEN12MSDataTools.plot_prediction(x, y, y_pred, os.path.join(figure_base_path, "prediction_1.png"))
+    # Extract corresponding x, y, y_pred triplet and plot it
+    pred_idxs = [0,50,100]
+    for pred_idx in pred_idxs:
+        x, y = x_set.get_item(pred_idx)
+        y_pred = np.argmax(y_pred_set[pred_idx], axis=2) + 1
+        SEN12MSDataTools.plot_prediction(x, y, y_pred, os.path.join(figure_base_path, f"prediction_{pred_idx}.png"))
 
 if __name__ == "__main__":
     main()

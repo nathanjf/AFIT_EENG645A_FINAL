@@ -128,15 +128,15 @@ class SEN12MSDataTools():
         
         # ax1 is a color sentinel 2 image
         ax1.imshow(sen2_color_image(x))
-        ax1.title("RGB Image")
+        ax1.set_title("RGB Image")
 
         # ax2 is the actual labels
         ax2.imshow(igbp_color_image(y))
-        ax2.title("True IGBP Labels")
+        ax2.set_title("True IGBP Labels")
 
         # ax3 is the predicted labels
         ax3.imshow(igbp_color_image(y_pred))
-        ax3.title("Predicted IGBP Labels")
+        ax3.set_title("Predicted IGBP Labels")
 
         # Plot the legend for the labels
         # Pack labels and colors into handles array
