@@ -114,7 +114,7 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
         return math.ceil(self.data.shape[0] / self.batch_size)
     
     def __getitem__(self, idx):
-        x : np.array = np.zeros(shape=(self.batch_size, 256, 256, 13))
+        x : np.array = np.zeros(shape=(self.batch_size, 256, 256, 15))
         y : np.array = np.zeros(shape=(self.batch_size, 256, 256, 1))
 
         start_idx = self.batch_size * idx
@@ -131,11 +131,11 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
                 s2_bands=S2Bands.ALL, 
                 lc_bands=LCBands.IGBP)
 
-            #s1 = reorder_image(s1)
+            s1 = reorder_image(s1)
             s2 = reorder_image(s2)
             lc = reorder_image(lc)
 
-            row_x = s2#np.dstack([s1, s2])
+            row_x = np.dstack([s2, s1])
             row_y = lc
 
             x[dataset_idx - start_idx] = row_x
@@ -143,7 +143,6 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
 
         # Do any preprocessing steps on the batches
 
-        
         x = normalize_image(x)
         y = onehot_encode(y)
 
@@ -196,11 +195,11 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
             s2_bands=S2Bands.ALL, 
             lc_bands=LCBands.IGBP)
 
-        #s1 = reorder_image(s1)
+        s1 = reorder_image(s1)
         s2 = reorder_image(s2)
         lc = reorder_image(lc)
 
-        x = normalize_image(s2) #np.dstack([s1, s2])
+        x = normalize_image(np.dstack([s2, s1]))
         y = flatten_image(lc)
 
         return x, y

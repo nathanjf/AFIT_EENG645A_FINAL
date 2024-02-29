@@ -12,6 +12,9 @@ class ClearMemory(keras.callbacks.Callback):
         keras.backend.clear_session()
 
 def set_gpu_gemory_growth():
+    """
+    Set memory growth for all gpus
+    """
     gpus = tf.config.list_physical_devices('GPU')
     if gpus:
         try:

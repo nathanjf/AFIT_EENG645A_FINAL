@@ -89,7 +89,7 @@ def main():
 
     # Chose which model
     # TODO : Convert to enum and use a switch in the model building step
-    do_train_model : bool = False
+    do_train_model : bool = True
     do_first_model : bool = True
     do_second_model : bool = False
     do_third_model : bool = False
@@ -121,7 +121,7 @@ def main():
         if do_first_model:
 
             model = modelTools.model_1(
-                input_shape=(256,256,13),
+                input_shape=(256,256,15),
                 num_classes=17,
                 resnet_depth=50,
                 resnet_filters=32
