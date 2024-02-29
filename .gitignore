@@ -1,8 +1,10 @@
 # Python
+*/__pycache__
 *.pyc
 
 # Data
-data/
+data/ROIs*
+data/seasons.csv
 
-# Models
-*.h5
+# Logs
+logs/
