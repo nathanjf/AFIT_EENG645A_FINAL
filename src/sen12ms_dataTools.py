@@ -151,3 +151,4 @@ class SEN12MSDataTools():
         fig.tight_layout()
 
         plt.savefig(filename)
+        plt.close()

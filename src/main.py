@@ -88,6 +88,7 @@ def main():
     model : keras.models.Model = None
 
     # Chose which model
+    # TODO : Convert to enum and use a switch in the model building step
     do_train_model : bool = False
     do_first_model : bool = True
     do_second_model : bool = False
@@ -172,6 +173,7 @@ def main():
         pass
 
     # Predict val set
+    # TODO : Convert to enum
     x_set : SEN12MSSequence = None
     do_test : bool = False
     if do_test:
@@ -180,13 +182,11 @@ def main():
         x_set = val
 
     y_pred_set = model.predict(
-        x=x_set, 
-        workers = 32, 
-        use_multiprocessing=True
+        x=x_set
     )
 
     # Extract corresponding x, y, y_pred triplet and plot it
-    pred_idxs = [0,50,100]
+    pred_idxs = range(0,32)
     for pred_idx in pred_idxs:
         x, y = x_set.get_item(pred_idx)
         y_pred = np.argmax(y_pred_set[pred_idx], axis=2) + 1
