@@ -8,8 +8,9 @@ from sen12ms_dataTools import SEN12MSDataTools
 from sen12ms_sequence import SEN12MSSequence
 import modelTools
 
-EPOCHS = 100
-BATCH_SIZE = 4
+from pprint import pprint
+
+import main_config as cfg
 
 figure_base_path = os.path.join(os.path.dirname(__file__), "..", "figures")
 
@@ -48,7 +49,7 @@ def get_data(data_ratio : float = 1.0, train_ratio : float = 0.8, val_ratio : fl
     # Split the index file
     train_data  = data[train_start_index:train_stop_index,  :]
     val_data    = data[val_start_index:val_stop_index,      :]
-    test_data   = data[test_start_index:,    :]
+    test_data   = data[test_start_index:,                   :]
 
     # Make sure all splits add up to the expected dataset size
     # print(train_data.shape)
@@ -57,9 +58,9 @@ def get_data(data_ratio : float = 1.0, train_ratio : float = 0.8, val_ratio : fl
     # print(train_data.shape[0] + val_data.shape[0]+ test_data.shape[0])
 
     # Initialize the sequences
-    train = SEN12MSSequence(train_data, BATCH_SIZE)
-    val = SEN12MSSequence(val_data, BATCH_SIZE)
-    test = SEN12MSSequence(test_data, BATCH_SIZE)
+    train = SEN12MSSequence(train_data, cfg.BATCH_SIZE)
+    val = SEN12MSSequence(val_data, cfg.BATCH_SIZE)
+    test = SEN12MSSequence(test_data, cfg.BATCH_SIZE)
 
     return train, val, test
 
@@ -79,9 +80,7 @@ def main():
     # Step 3
     # Prepare data
 
-    train, val, test = get_data(0.05) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
-    train.calculate_class_weights()
-    class_weights = train.get_class_weights()
+    train, val, test = get_data(0.03) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
 
     # Training Phase
 
@@ -89,9 +88,9 @@ def main():
 
     # Chose which model
     # TODO : Convert to enum and use a switch in the model building step
-    do_train_model : bool = True
-    do_first_model : bool = True
-    do_second_model : bool = False
+    do_train_model : bool = False
+    do_first_model : bool = False
+    do_second_model : bool = True
     do_third_model : bool = False
     if not (do_first_model ^ do_second_model ^ do_third_model):
         raise RuntimeError("Only one model can be true at at time")
@@ -114,7 +113,7 @@ def main():
 
     # Do model training or load model
     if do_train_model:
-
+        
         # Step 5
         # Baseline Model
 
@@ -122,9 +121,9 @@ def main():
 
             model = modelTools.model_1(
                 input_shape=(256,256,15),
-                num_classes=17,
-                resnet_depth=50,
-                resnet_filters=32
+                num_classes=10,
+                resnet_depth=10,
+                resnet_filters=128
             )
 
         # Step 6
@@ -132,21 +131,25 @@ def main():
 
         if do_second_model:
         
-            # TODO : 
-
-            pass
+            model = modelTools.model_2(
+                input_shape=(256,256,15),
+                num_classes=10,
+                filters=2
+            )
 
         # Step 7
         # Regularize Model
 
         if do_third_model:
             
-            # TODO :
-            
-            pass
+            model = modelTools.model_3(
+                input_shape=(256,256,16),
+                num_classes=10,
+                filters=8
+            )
 
         # Plot the model
-        keras.utils.plot_model(model, to_file=model_figure_path, show_shapes=False, show_layer_names=False, show_layer_activations=False)
+        keras.utils.plot_model(model, to_file=model_figure_path, show_shapes=True, show_layer_names=False, show_layer_activations=True)
 
         # Compile the model
         model.compile(
@@ -155,16 +158,23 @@ def main():
             metrics=['categorical_accuracy']
         )
 
+        train.calculate_class_weights()
+        class_weights = train.get_class_weights()
+
         # Fit the model
         model.fit(
             x=train,
             validation_data=val,
             class_weight=class_weights,
-            batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
-            callbacks=[keras.callbacks.EarlyStopping(monitor='loss', patience=3), keras.callbacks.TensorBoard(log_dir=model_log_path), modelTools.ClearMemory()],
-            workers=32,
-            use_multiprocessing=True
+            batch_size=cfg.BATCH_SIZE,
+            epochs=cfg.EPOCHS,
+            callbacks=[
+                keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=3), 
+                keras.callbacks.TensorBoard(log_dir=model_log_path, update_freq='epoch'), 
+                modelTools.ClearMemory()
+            ],
+            workers=cfg.WORKERS,
+            use_multiprocessing=cfg.MULTIPROCESSING
         )
 
         model.save(model_path)
@@ -181,15 +191,11 @@ def main():
     else:
         x_set = val
 
-    y_pred_set = model.predict(
-        x=x_set
-    )
-
-    # Extract corresponding x, y, y_pred triplet and plot it
-    pred_idxs = range(0,32)
-    for pred_idx in pred_idxs:
+    # Run predictions on a subset of the test set
+    for pred_idx in range(0, 32):
         x, y = x_set.get_item(pred_idx)
-        y_pred = np.argmax(y_pred_set[pred_idx], axis=2) + 1
+        y = np.reshape(np.argmax(y, axis=3) + 1, (256,256))
+        y_pred = np.reshape(np.argmax(model(np.reshape(x.copy(), (1,256,256,15))), axis=3) + 1, (256,256))        
         SEN12MSDataTools.plot_prediction(x, y, y_pred, os.path.join(figure_base_path, f"prediction_{pred_idx}.png"))
 
 if __name__ == "__main__":

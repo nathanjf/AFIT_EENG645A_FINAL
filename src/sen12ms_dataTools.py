@@ -4,50 +4,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
+import main_config as cfg
 from sen12ms_dataLoader import SEN12MSDataset, Seasons, LCBands, S1Bands, S2Bands
 
 sen12ms_path = os.path.join(os.path.dirname(__file__), "..", "data")
 spring_only_path = os.path.join(os.path.dirname(__file__), "..", "data", "spring_only.txt")
-
-seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
-colors = {
-    1   : [230,25,75],      # Evergreen Needleleaf Forests
-    2   : [60,180,75],      # Evergreen Broadleaf Forests
-    3   : [255,225,25],     # Deciduous Needleleaf Forests
-    4   : [0,130,200],      # Deciduous Broadleaf Forests
-    5   : [235,130,48],     # Mixed Forests
-    6   : [145,30,180],     # Closed (Dense) Shrubland
-    7   : [70,240,240],     # Open (Sparse) Shrubland
-    8   : [240,50,230],     # Woody Savannas
-    9   : [210,245,60],     # Savannas
-    10  : [250,190,212],    # Grasslands
-    11  : [0,128,128],      # Permanent Wetlands
-    12  : [220,190,255],    # Croplands
-    13  : [170,110,40],     # Urban and Built-Up Lands
-    14  : [255,250,200],    # Croplands/Natural Vegetation Mosaics
-    15  : [120,0,0],        # Permanent Snow and Ice
-    16  : [170,255,195],    # Barren
-    17  : [128,128,0],      # Water Bodies
-}
-names = {
-    1   : 'Evergreen Needleleaf Forests',
-    2   : 'Evergreen Broadleaf Forests',
-    3   : 'Deciduous Needleleaf Forests',
-    4   : 'Deciduous Broadleaf Forests',
-    5   : 'Mixed Forests',
-    6   : 'Closed (Dense) Shrubland',
-    7   : 'Open (Sparse) Shrubland',
-    8   : 'Woody Savannas',
-    9   : 'Savannas',
-    10  : 'Grasslands',
-    11  : 'Permanent Wetlands',
-    12  : 'Croplands',
-    13  : 'Urban and Built-Up Lands',
-    14  : 'Croplands/Natural Vegetation Mosaics',
-    15  : 'Permanent Snow and Ice',
-    16  : 'Barren',
-    17  : 'Water Bodies'
-}
 
 def sen2_color_image(image : np.array):
     out = np.zeros((image.shape[0],image.shape[1],3))
@@ -57,22 +18,22 @@ def sen2_color_image(image : np.array):
             # loop over the bands in rgb order
             for k in [3,2,1]:
                 out[i][j][color_idx] = image[i][j][k]
-
                 color_idx += 1
-
     return out / np.max(out)
 
 def igbp_color_image(image : np.array):
+    colors = None
+    match cfg.MODE:
+        case cfg.RunMode.SIMPLE:
+            colors = cfg.simple_colors        
+        case cfg.RunMode.COMPLEX:
+            colors = cfg.colors
+
     out = np.zeros((image.shape[0], image.shape[1], 3))
 
     # Iterate over the pixels and replace them with the colors from the class dictionary
     for i in range(0,image.shape[0]):
         for j in range(0,image.shape[1]):
-            # It seems like there is missing data for some of the images
-            if image[i][j] not in colors.keys():
-                print("missing pixel")
-                out[i][j] = [0, 0, 0]
-            else:
                 out[i][j] = colors[image[i][j]]
     return out.astype(int)
 
@@ -121,7 +82,16 @@ class SEN12MSDataTools():
         return self.data
 
     def plot_prediction(x, y, y_pred, filename):
-        
+        colors = None
+        names = None
+        match cfg.MODE:
+            case cfg.RunMode.SIMPLE:
+                colors = cfg.simple_colors        
+                names = cfg.simple_names
+            case cfg.RunMode.COMPLEX:
+                colors = cfg.colors
+                names = cfg.names
+
         # Replace each label with a color
         # subplot all 3 next to eachother
         fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=[15,5])

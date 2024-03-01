@@ -5,30 +5,10 @@ import tensorflow as tf
 import progressbar
 from multiprocessing.pool import ThreadPool
 
+import main_config as cfg
 from sen12ms_dataLoader import SEN12MSDataset, Seasons, S1Bands, S2Bands, LCBands
 
 sen12ms_path = os.path.join(os.path.dirname(__file__), "..", "data")
-
-seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
-classes = {
-    1   : [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],  # Evergreen Needleleaf Forests
-    2   : [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],  # Evergreen Broadleaf Forests
-    3   : [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0],  # Deciduous Needleleaf Forests
-    4   : [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],  # Deciduous Broadleaf Forests
-    5   : [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],  # Mixed Forests
-    6   : [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],  # Closed (Dense) Shrubland
-    7   : [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0],  # Open (Sparse) Shrubland
-    8   : [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],  # Woody Savannas
-    9   : [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],  # Savannas
-    10  : [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],  # Grasslands
-    11  : [0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],  # Permanent Wetlands
-    12  : [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],  # Croplands
-    13  : [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],  # Urban and Built-Up Lands
-    14  : [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],  # Croplands/Natural Vegetation Mosaics
-    15  : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0],  # Permanent Snow and Ice
-    16  : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],  # Barren
-    17  : [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]   # Water Bodies
-}
 
 def flatten_image(image : np.array):
     out = np.zeros((image.shape[0],image.shape[1]))
@@ -47,6 +27,12 @@ def reorder_image(image : np.array):
     return image
 
 def onehot_decode(image : np.array):
+    classes = None
+    match cfg.MODE:
+        case cfg.RunMode.SIMPLE:
+            classes = cfg.simple_classes       
+        case cfg.RunMode.COMPLEX:
+            classes = cfg.classes
 
     y_decode = np.zeros(shape=(image.shape[0], image.shape[1]))
 
@@ -60,39 +46,62 @@ def onehot_decode(image : np.array):
     return y_decode
 
 def onehot_encode(y : np.array):
+    classes = None
+    num_classes = 0
+    match cfg.MODE:
+        case cfg.RunMode.SIMPLE:
+            classes = cfg.simple_classes_conversion       
+            num_classes = 10
+        case cfg.RunMode.COMPLEX:
+            classes = cfg.classes
+            num_classes = 17
 
-    y_onehot = np.zeros(shape=(y.shape[0], y.shape[1], y.shape[2], len(classes)))
-
+    y_onehot = np.zeros(shape=(y.shape[0], y.shape[1], y.shape[2], num_classes))
     for i in range(0, y.shape[0]):
         for j in range(0,y.shape[1]):
             for k in range(0,y.shape[2]):
                 if y[i][j][k][0] == 0:
-                    y_onehot[i][j][k] = classes[10]
-                else:
-                    y_onehot[i][j][k] = classes[y[i][j][k][0]]
+                    print(y[i])
+                y_onehot[i][j][k] = classes[y[i][j][k][0]]
 
     return y_onehot
 
+def convert_to_simple(image : np.array):
+    pass
+
 def _thread_calculate_class_weights(args):
+    classes = None
+    match cfg.MODE:
+        case cfg.RunMode.SIMPLE:
+            classes = cfg.simple_classes_conversion       
+        case cfg.RunMode.COMPLEX:
+            classes = cfg.classes
+
     class_weights = {}
     for key in classes.keys():
-        class_weights[key-1] = 0
+        class_weights[np.argmax(classes[key], axis=0)] = 1
 
     sen12ms : SEN12MSDataset = args[0]
     data = args[1]
 
     # Load triplet from index
-    lc = sen12ms.get_patch(
-        seasons[int(data[0])],
+    lc, _ = sen12ms.get_patch(
+        cfg.seasons[int(data[0])],
         int(data[1]),
         int(data[2]),
         LCBands.IGBP)
-
+  
     # Get the counts of each class
-    unique, counts = np.unique(lc[0], return_counts=True)
-            
+    unique, counts = np.unique(lc, return_counts=True)
+
+    # Convert to the simple scene if needed
+    if cfg.MODE == cfg.RunMode.SIMPLE:
+        # Replace values
+        for i in range(0, len(unique)):
+            unique[i] = np.argmax(classes[unique[i]], axis=0) + 1
+
     # Update the class weights with the counts
-    for i in range(0,len(unique)):
+    for i in range(0, len(unique)):
         if unique[i]-1 in class_weights.keys():
             class_weights[unique[i]-1] += counts[i]
         else:
@@ -114,17 +123,20 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
         return math.ceil(self.data.shape[0] / self.batch_size)
     
     def __getitem__(self, idx):
-        x : np.array = np.zeros(shape=(self.batch_size, 256, 256, 15))
-        y : np.array = np.zeros(shape=(self.batch_size, 256, 256, 1))
 
         start_idx = self.batch_size * idx
         end_idx = min(start_idx + self.batch_size, self.data.shape[0])
         
+        data_length = (end_idx - start_idx)
+
+        x : np.array = np.zeros(shape=(data_length, 256, 256, 15))
+        y : np.array = np.zeros(shape=(data_length, 256, 256, 1))
+  
         for dataset_idx in range(start_idx, end_idx):
             
             # Load triplet from index
             s1, s2, lc, bounds = self.sen12ms.get_s1s2lc_triplet(
-                seasons[int(self.data[dataset_idx][0])], 
+                cfg.seasons[int(self.data[dataset_idx][0])], 
                 int(self.data[dataset_idx][1]), 
                 int(self.data[dataset_idx][2]), 
                 s1_bands=S1Bands.ALL,
@@ -162,17 +174,17 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
             args.append((self.sen12ms, self.data[i][:]))
 
         # Multithreaded label counting
-        with ThreadPool(128) as pool:
+        with ThreadPool(cfg.WORKERS) as pool:
             for result in pool.imap(_thread_calculate_class_weights, args):
                 # Merge results
                 class_weights = result[0]
                 samples = result[1]
 
-                for key in class_weights:
+                for key in class_weights.keys():
                     if key in self.class_weights.keys():
                         self.class_weights[key] += class_weights[key]
                     else:
-                        self.class_weights[key] = 0
+                        self.class_weights[key] = class_weights[key]
 
                 total_samples += samples
                 
@@ -188,7 +200,7 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
     def get_item(self, dataset_idx):
         
         s1, s2, lc, bounds = self.sen12ms.get_s1s2lc_triplet(
-            seasons[int(self.data[dataset_idx][0])], 
+            cfg.seasons[int(self.data[dataset_idx][0])], 
             int(self.data[dataset_idx][1]), 
             int(self.data[dataset_idx][2]), 
             s1_bands=S1Bands.ALL,
@@ -200,6 +212,6 @@ class SEN12MSSequence(tf.keras.utils.Sequence):
         lc = reorder_image(lc)
 
         x = normalize_image(np.dstack([s2, s1]))
-        y = flatten_image(lc)
+        y = onehot_encode(np.reshape(lc, (1, 256, 256, 1)))
 
         return x, y

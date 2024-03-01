@@ -1,15 +1,16 @@
 import gc
 import keras
 import tensorflow as tf
-from keras.layers import Input, Conv2D, Conv2DTranspose, BatchNormalization, ReLU, MaxPooling2D, Add
+import math
+from keras.layers import Input, Conv2D, Conv2DTranspose, BatchNormalization, ReLU, MaxPooling2D, Add, Concatenate
 
 class ClearMemory(keras.callbacks.Callback):
     """
     Custom callback that manually runs garbage collection at the end of each epoch to avoid a memory leak present in tensorflow
     """
     def on_epoch_end(self, epoch, logs=None):
-        gc.collect()
         keras.backend.clear_session()
+        gc.collect()
 
 def set_gpu_gemory_growth():
     """
@@ -63,65 +64,63 @@ def model_1(input_shape=None, num_classes=None, resnet_depth=50, resnet_filters=
     
     return model
 
-def model_old():
+def WideUNetLayer(input_layer, width, filters, kernel_size):
+    paths = []
+    for i in range(0, width):
+        # Downsample up to i times
+        skips = []
+        conv = input_layer
+        for depth in range(0, i):
+            # Conv block
+            conv = Conv2D(filters=filters*(2**(depth)), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+            conv = Conv2D(filters=filters*(2**(depth)), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+            pool = MaxPooling2D(pool_size=2)(conv)
+            
+            # Add conv to the skip array
+            skips.append(conv)
+            
+            conv = pool
+
+        # Core convolution blocks
+        conv = Conv2D(filters=filters*width, kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+        conv = Conv2D(filters=filters*width, kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+
+        # Upsample up to i times
+        for depth in range(0, i):
+            deconv = Conv2DTranspose(filters=filters*(2**(i-depth)), kernel_size=kernel_size, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+            concat = Concatenate(axis=3)([deconv, skips[i-depth-1]])
+            
+            conv = concat
+
+        paths.append(conv)
+
+    concat = Concatenate()(paths)
+
+    return concat
+
+def model_2(input_shape=None, num_classes=None, filters=32, kernel_size=3):
+    inputs : keras.layers.Layer
+    outputs : keras.layers.Layer
+
+    # Determine how many unets are needed to get to a 1x1 convolution
+    width = int(math.log(input_shape[0], 2))
+
+    # Inputs
+    inputs = Input(shape=input_shape)
+
+    # Resnext
+    wide_unet = WideUNetLayer(inputs, width=width, filters=filters, kernel_size=kernel_size)
     
-    input : keras.layers.Layer
-    output : keras.layers.Layer
+    # Prediction
+    outputs = Conv2D(filters=num_classes, kernel_size=kernel_size, strides=1, padding='same', activation='softmax', kernel_initializer='he_normal')(wide_unet)
 
-    input = Input(shape=(256,256,13))
+    model = keras.models.Model(inputs=inputs, outputs=outputs)
 
-    # CNN
-    conv_layer_1    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(input)
-    conv_layer_2    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_1)
-    batch_norm_1    = BatchNormalization()(conv_layer_2)
-    pooling_layer_1 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_1)
+    return model
+
+
+def model_3(input_shape=None, num_classes=None, filters=32, kernel_size=3):
     
-    conv_layer_3    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_1)
-    conv_layer_4    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_3)
-    batch_norm_2    = BatchNormalization()(conv_layer_4)
-    pooling_layer_2 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_2)
-
-    conv_layer_5    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_2)
-    conv_layer_6    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_5)
-    batch_norm_3    = BatchNormalization()(conv_layer_6)
-    pooling_layer_3 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_3)
-
-    conv_layer_7    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(pooling_layer_3)
-    conv_layer_8    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(conv_layer_7)
-    batch_norm_4    = BatchNormalization()(conv_layer_8)
-    pooling_layer_4 = MaxPooling2D(pool_size=2, strides=2, padding='valid')(batch_norm_4)
-
-    # Passthroughs
-    # TODO : Upsample passthrough layers to match intermediate steps
-    passthrough_1 = batch_norm_1
-    passthrough_2 = batch_norm_2
-    passthrough_3 = batch_norm_3
-    passthrough_4 = batch_norm_4
-
-    # FNN
-
-    #upsampling_layer_1 = UpSampling2D(size=(4,4))(pooling_layer_4)
-    deconv_layer_1 = Conv2DTranspose(filters=1024, kernel_size=2, strides=2, padding='same', activation='relu')(pooling_layer_4)
-    conv_layer_9    = Conv2D(filters=1024, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_1)
-    #add_layer_1 = Add()([conv_layer_9, passthrough_4])
-
-    #upsampling_layer_2 = UpSampling2D(size=(4,4))(add_layer_1)
-    deconv_layer_2 = Conv2DTranspose(filters=512, kernel_size=2, strides=2, padding='same', activation='relu')(conv_layer_9)
-    conv_layer_10    = Conv2D(filters=512, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_2)
-    add_layer_2 = Add()([conv_layer_10, passthrough_3])
-
-    #upsampling_layer_3 = UpSampling2D(size=(4,4))(add_layer_2)
-    deconv_layer_3 = Conv2DTranspose(filters=256, kernel_size=2, strides=2, padding='same', activation='relu')(add_layer_2)
-    conv_layer_11    = Conv2D(filters=256, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_3)
-    add_layer_3 = Add()([conv_layer_11, passthrough_2])
-
-    #upsampling_layer_4 = UpSampling2D(size=(4,4))(add_layer_3)
-    deconv_layer_4 = Conv2DTranspose(filters=128, kernel_size=2, strides=2, padding='same', activation='relu')(add_layer_3)
-    conv_layer_12    = Conv2D(filters=128, kernel_size=2, strides=1, padding='same', activation='relu')(deconv_layer_4)
-    add_layer_4 = Add()([conv_layer_12, passthrough_1])
-
-    output = Conv2DTranspose(filters=17, kernel_size=2, strides=1, padding='same', activation='softmax')(add_layer_4)
-
-    model = keras.models.Model(inputs=input, outputs=output)
+    # TODO : Standard Unet
     
     pass
