@@ -120,7 +120,47 @@ def model_2(input_shape=None, num_classes=None, filters=32, kernel_size=3):
 
 
 def model_3(input_shape=None, num_classes=None, filters=32, kernel_size=3):
+    """
+        Basic UNET
+    """
+
+    inputs : keras.layers.Layer
+    outputs : keras.layers.Layer
+
+    # Determine how many modules are needed to get to a 1x1 convolution
+    max_depth = int(math.log(input_shape[0], 2))
+
+    # Inputs
+    inputs = Input(shape=input_shape)
+
+    # Encode
+    skips = []
+    conv = inputs
+    for depth in range(0, max_depth):
+        # Conv block
+        conv = Conv2D(filters=filters*(2**(depth)), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+        conv = Conv2D(filters=filters*(2**(depth)), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+        pool = MaxPooling2D(pool_size=2)(conv)
+        
+        # Add conv to the skip array
+        skips.append(conv)
+        
+        conv = pool
+
+    # Core convolution blocks
+    conv = Conv2D(filters=filters*(2**max_depth), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+    conv = Conv2D(filters=filters*(2**max_depth), kernel_size=kernel_size, strides=1, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+
+    # Decode
+    for depth in range(0, max_depth):
+        deconv = Conv2DTranspose(filters=filters*(2**(max_depth-depth)), kernel_size=kernel_size, strides=2, padding='same', activation='relu', kernel_initializer='he_normal')(conv)
+        concat = Concatenate(axis=3)([deconv, skips[max_depth-depth-1]])
+        
+        conv = concat
+
+    # Predict
+    outputs = Conv2D(filters=num_classes, kernel_size=kernel_size, strides=1, padding='same', activation='softmax', kernel_initializer='he_normal')(conv)
+
+    model = keras.models.Model(inputs=inputs, outputs=outputs)
     
-    # TODO : Standard Unet
-    
-    pass
+    return model

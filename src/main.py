@@ -80,7 +80,7 @@ def main():
     # Step 3
     # Prepare data
 
-    train, val, test = get_data(0.03) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
+    train, val, test = get_data(0.5) # TODO : IN THE FINAL FIT MAKE SURE THIS IS SET TO 1
 
     # Training Phase
 
@@ -88,10 +88,10 @@ def main():
 
     # Chose which model
     # TODO : Convert to enum and use a switch in the model building step
-    do_train_model : bool = False
+    do_train_model : bool = True
     do_first_model : bool = False
-    do_second_model : bool = True
-    do_third_model : bool = False
+    do_second_model : bool = False
+    do_third_model : bool = True
     if not (do_first_model ^ do_second_model ^ do_third_model):
         raise RuntimeError("Only one model can be true at at time")
     
@@ -143,9 +143,9 @@ def main():
         if do_third_model:
             
             model = modelTools.model_3(
-                input_shape=(256,256,16),
+                input_shape=(256,256,15),
                 num_classes=10,
-                filters=8
+                filters=16
             )
 
         # Plot the model
