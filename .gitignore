@@ -8,3 +8,6 @@ data/seasons.csv
 
 # Logs
 logs/
+
+# Trained models
+models/

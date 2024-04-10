@@ -4,6 +4,11 @@ class RunMode(enumerate):
     COMPLEX = 0
     SIMPLE = 1
 
+class Model(enumerate):
+    UNET = 0
+    CHARACTERIZATION = 1
+    RESNET = 2
+
 seasons = [Seasons.SPRING, Seasons.SUMMER, Seasons.FALL, Seasons.WINTER]
 classes = {
     1   : [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],  # Evergreen Needleleaf Forests
@@ -118,7 +123,22 @@ simple_names = {
     9   : 'Barren',
     10  : 'Water'  
 }
+simple_just_names = [
+    'Forest',
+    'Shrubland',
+    'Savanna',
+    'Grassland',
+    'Wetlands',
+    'Croplands',
+    'Urban and Built-Up',
+    'Snow and Ice',
+    'Barren',
+    'Water'  
+]
 
+
+TRAIN = False
+MODEL = Model.UNET
 MODE = RunMode.SIMPLE
 WORKERS = 32
 MULTIPROCESSING=True

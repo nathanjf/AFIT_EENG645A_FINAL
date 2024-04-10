@@ -81,6 +81,39 @@ class SEN12MSDataTools():
     def get_data(self):
         return self.data
 
+    def plot_bands(image : np.array, save_path : str):
+        # Take an image, and plot a bunch of stuff, then save it
+        # Natural color
+        plt.figure()
+        plt.imshow(image[:,:,[3, 2, 1] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "00_natural_color"))
+        plt.close()
+
+        plt.figure()
+        plt.imshow(image[:,:,[7, 3, 2] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "01_color_infrared"))
+        plt.close()
+
+        plt.figure()
+        plt.imshow(image[:,:,[11, 8, 3] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "02_short_wave_infrared"))
+        plt.close()
+
+        plt.figure()
+        plt.imshow(image[:,:,[10, 7, 1] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "03_agricultural"))
+        plt.close()
+
+        plt.figure()
+        plt.imshow(image[:,:,[11, 10, 1] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "04_geology"))
+        plt.close()
+
+        plt.figure()
+        plt.imshow(image[:,:,[3, 2, 0] ]/ np.max(image))
+        plt.savefig(os.path.join(save_path, "05_bathymetric"))
+        plt.close()
+
     def plot_prediction(x, y, y_pred, filename):
         colors = None
         names = None
